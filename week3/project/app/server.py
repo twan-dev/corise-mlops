@@ -34,6 +34,12 @@ def startup_event():
     Access to the model instance and log file will be needed in /predict endpoint, make sure you
     store them as global variables
     """
+    global news_classifier_global, log_global
+
+    news_classifier_global = NewsCategoryClassifier()
+    news_classifier_global.load(MODEL_PATH)
+
+    log_global = open(LOGS_OUTPUT_PATH, "a+")
     logger.info("Setup completed")
 
 
@@ -45,6 +51,7 @@ def shutdown_event():
     1. Make sure to flush the log file and close any file pointers to avoid corruption
     2. Any other cleanups
     """
+    log_global.close()
     logger.info("Shutting down application")
 
 
@@ -65,7 +72,21 @@ def predict(request: PredictRequest):
     }
     3. Construct an instance of `PredictResponse` and return
     """
-    response = PredictResponse(scores={"label1": 0.9, "label2": 0.1}, label="label1")
+    start_time = datetime.now()
+
+    score = news_classifier_global.predict_proba(request)
+    label = news_classifier_global.predict_label(request)
+    response = PredictResponse(scores=score, label=label)
+
+    log_data = {
+        'timestamp': datetime.now().strftime('%Y:%m:%d %H:%M%S'),
+        'request': request,
+        'prediction': score,
+        'latency': (datetime.now() - start_time).total_seconds() * 1000
+    }
+
+    log_global.write(str(log_data) + '\n')
+    
     return response
 
 
